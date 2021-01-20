@@ -2,7 +2,8 @@ from nltk import WordNetLemmatizer
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.stem.snowball import SnowballStemmer
 
-from lexi.config import RESOURCES, MODELS_DIR
+from lexi.config import RESOURCES, MODELS_DIR, DEFAULT_THRESHOLD, \
+    NUM_REPLACEMENTS
 
 from lexi.core.util import util
 from lexi.core.simplification import SimplificationPipeline
@@ -118,7 +119,7 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
 class MounicaCWI():
     def __init__(self):
         self.lexicon = WordComplexityLexicon(RESOURCES["en"]["mounica-lexicon"])
-        self.cwi_threshold = 0.5
+        self.cwi_threshold = DEFAULT_THRESHOLD
         
     def score(self, sent, start_offset, end_offset):
         return float(self.lexicon.get_feature([sent[start_offset:end_offset]])[0] / 6)
@@ -146,7 +147,7 @@ class MounicaGenerator:
                     replacements = {}
                 else:
                     replacements = self.corpus[tokens[0]]
-                if tokens[0] not in self.corpus or len(self.corpus[tokens[0]]) < 10:
+                if tokens[0] not in self.corpus or len(self.corpus[tokens[0]]) < NUM_REPLACEMENTS:
                     replacements[tokens[1]] = float(tokens[2])
                     self.corpus[tokens[0]] = replacements
 

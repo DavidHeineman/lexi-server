@@ -20,6 +20,11 @@ FEATURIZER_PATH_TEMPLATE = os.path.join(FEATURIZERS_DIR, "{}.json")
 LEXICAL_MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}-lexical.pickle")
 MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}.pickle")
 
+# Parameters for English Models
+DEFAULT_THRESHOLD = 0.5 # Default threshold for determining a word "complex" for new users
+NUM_REPLACEMENTS = 10   # Maximum number of candidate replacements generated
+
+# See README.MD in project directory for links to download the data
 RESOURCES = {
     "en": {
         "mounica-lexicon":

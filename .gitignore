@@ -12,3 +12,4 @@ res/
 env-lexi/*
 lexi/core/simplification/lexicalOLD.py
 lexi/core/simplification/utilOLD.py
+run_lexi_server.py
