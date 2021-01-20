@@ -22,31 +22,19 @@ MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}.pickle")
 
 RESOURCES = {
     "en": {
-        #"embeddings":
-        #    [RESOURCES_DIR + "/en/en_embedding.bin"],
-        #"lm":
-        #    RESOURCES_DIR + "/en/en_lm.bin",
-        #"ubr":
-        #    RESOURCES_DIR + "/en/en_ubr.txt",
-        #"ranking_training_dataset":
-        #    RESOURCES_DIR + "/en/en_ls.txt",
-        #"synonyms":
-        #    [RESOURCES_DIR + "/en/en_synonyms.csv"],
         "mounica-lexicon":
             RESOURCES_DIR + "/en/complexity_lexicon.tsv",
         "ppdb-lexicon":
             RESOURCES_DIR + "/en/simpleppdbpp_lexicon.txt",
         "nrr": {
-            "train": RESOURCES_DIR + "/nrr/test_data_victor.txt",
-            "test": RESOURCES_DIR + "/nrr/train_data_victor.txt",
-            "lm": RESOURCES_DIR + "/nrr/subimdb_5_srilm_default.bin",
-            "lexicon": RESOURCES_DIR + "/nrr/lexicon.tsv",
-            "word2vec": RESOURCES_DIR + "/nrr/en_googlenews_embedding.bin",
-            "google": RESOURCES_DIR + "/nrr/semeval_train_test_google_freq.txt",
-            "wiki": RESOURCES_DIR + "/nrr/simpleppdb_human_wiki_ratio.txt",
-            "ppdb": RESOURCES_DIR + "/nrr/semeval_train_test_ppdb_scores.txt",
-            
-            #"model": MODELS_DIR + "/mounica/nrr_default.bin",
+            "train": RESOURCES_DIR + "/en/nrr/test_data_victor.txt",
+            "test": RESOURCES_DIR + "/en/nrr/train_data_victor.txt",
+            "lm": RESOURCES_DIR + "/en/nrr/subimdb_5_srilm_default.bin",
+            "lexicon": RESOURCES_DIR + "/en/complexity_lexicon.tsv",
+            "word2vec": RESOURCES_DIR + "/en/nrr/en_googlenews_embedding.bin",
+            "google": RESOURCES_DIR + "/en/nrr/semeval_train_test_google_freq.txt",
+            "wiki": RESOURCES_DIR + "/en/nrr/simpleppdb_human_wiki_ratio.txt",
+            "ppdb": RESOURCES_DIR + "/en/nrr/semeval_train_test_ppdb_scores.txt"
         }
     },
         

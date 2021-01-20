@@ -2,13 +2,13 @@
 
 import numpy as np
 
-from lexi.core.mounica.nrr.features.word2vec import Word2Vec
-from lexi.core.mounica.nrr.features.ppdb_scores import PPDBScores
-from lexi.core.mounica.nrr.features.wiki_frequency import WikiFrequency
-from lexi.core.mounica.nrr.features.lexicon import WordComplexityLexicon
-from lexi.core.mounica.nrr.features.google_frequency import GoogleFrequency
-from lexi.core.mounica.nrr.features.syllable_counter import SyllableCounter
-from lexi.core.mounica.nrr.features.gaussian_binner import GaussianBinner
+from lexi.core.en_nrr.features.word2vec import Word2Vec
+from lexi.core.en_nrr.features.ppdb_scores import PPDBScores
+from lexi.core.en_nrr.features.wiki_frequency import WikiFrequency
+from lexi.core.en_nrr.features.lexicon import WordComplexityLexicon
+from lexi.core.en_nrr.features.google_frequency import GoogleFrequency
+from lexi.core.en_nrr.features.syllable_counter import SyllableCounter
+from lexi.core.en_nrr.features.gaussian_binner import GaussianBinner
 
 
 class FeatureExtractorSimplePPDB:

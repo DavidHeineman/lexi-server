@@ -1,10 +1,10 @@
+import os
 import torch
 import argparse
 from torch.autograd import Variable
-from lexi.core.mounica.nrr.nrr import NRR
-from lexi.core.mounica.nrr.metrics import evaluate_ranker
-from lexi.core.mounica.nrr.config import RankerConfig
-from lexi.core.mounica.nrr.features.feature_extractor_sr import FeatureExtractorSR
+from lexi.core.en_nrr.nrr import NRR
+from lexi.core.en_nrr.metrics import evaluate_ranker
+from lexi.core.en_nrr.features.feature_extractor_sr import FeatureExtractorSR
 from lexi.config import RESOURCES, RANKER_DIR
 
 args = RESOURCES['en']['nrr']
@@ -21,6 +21,21 @@ train_x, train_y = feat_extractor.get_features(args['train'], True)
 
 print("Extracting test data features")
 test_x, test_y = feat_extractor.get_features(args['test'], False)
+
+print("Training NRR model")
+nrr = NRR(train_x, train_y, dropout)
+nrr.model.training = True
+optimizer = torch.optim.Adam(nrr.model.parameters(), lr=lr)
+
+for epoch in range(epochs):
+    y_pred = nrr.model(nrr.train_x)
+    loss = nrr.loss_fn(torch.cat(y_pred.unbind()), nrr.train_y)  # should be just y_pred
+    if epoch % 20 == 0:
+        loss_val = loss.data.cpu().numpy().tolist()
+        print("MSE loss after %d iterations: %.2f" % (epoch, loss_val))
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
 print("Ranking test data substitutions using NRR")
 nrr.set_testing()
@@ -47,5 +62,9 @@ for line in open(args['test'], encoding='utf-8'):
 print("Evaluation")
 p_at_1, pearson = evaluate_ranker(args['test'], pred_rankings)
 print("Metrics (P@1, Pearson): %f %f" % (p_at_1*100, pearson))
+
+if not os.path.exists(RANKER_DIR):
+    print('Saved model to %s' % (RANKER_DIR+'/default.bin'))
+    os.makedirs(RANKER_DIR)
 
 torch.save(nrr, RANKER_DIR+'/default.bin')

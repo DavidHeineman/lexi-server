@@ -2,15 +2,14 @@ from nltk import WordNetLemmatizer
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.stem.snowball import SnowballStemmer
 
-from lexi.config import RESOURCES
+from lexi.config import RESOURCES, MODELS_DIR
 
 from lexi.core.util import util
 from lexi.core.simplification import SimplificationPipeline
 import logging
 logger = logging.getLogger('lexi')
 
-from lexi.core.mounica.nrr.evaluator import SingleNRR
-from lexi.core.mounica.cwi.evaluator import SingleCWI
+from lexi.core.en_nrr.evaluator import SingleNRR
 
 import re
 
@@ -162,7 +161,7 @@ class MounicaGenerator:
         
 class MounicaRanker:
     def __init__(self, resources=RESOURCES):
-        self.nrr = SingleNRR(RESOURCES["en"]["nrr"])
+        self.nrr = SingleNRR(resources['en']['nrr'], MODELS_DIR+'/rankers/default.bin')
         
     def rank(self, candidates, sentence=None, wb=0, we=0):
         try:

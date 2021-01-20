@@ -9,3 +9,6 @@ lexi.cfg
 lexi/res/*
 .ipynb_checkpoints/
 res/
+env-lexi/*
+lexi/core/simplification/lexicalOLD.py
+lexi/core/simplification/utilOLD.py

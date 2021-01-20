@@ -1,12 +1,12 @@
-from lexi.core.mounica.nrr.features.feature_extractor_sr import FeatureExtractorSR
-from lexi.core.mounica.nrr.nrr import NRR
+from lexi.core.en_nrr.features.feature_extractor_sr import FeatureExtractorSR
+from lexi.core.en_nrr.nrr import NRR
 import torch
 
 class SingleNRR:
     
-    def __init__(self, resources):
+    def __init__(self, resources, model):
         self.feat_extractor = FeatureExtractorSR(resources)
-        self.nrr = torch.load(resources['model'])
+        self.nrr = torch.load(model)
         
     def evaluate(self, sent, target, candidates):
         # Extracts features from input
