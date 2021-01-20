@@ -31,7 +31,7 @@ class DatabaseConnection:
                     "password": kwargs["password"]
                 }
                 self.pg_connection = mysql.connector.connect(**args)
-            self.cursor = self.pg_connection.cursor(buffered=True)
+            self.cursor = self.pg_connection.cursor() #buffered=True
             logger.info("Connected to database '{}' at '{}'.".format(
                 kwargs["name"], kwargs["host"]
             ))

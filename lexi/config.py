@@ -20,33 +20,34 @@ FEATURIZER_PATH_TEMPLATE = os.path.join(FEATURIZERS_DIR, "{}.json")
 LEXICAL_MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}-lexical.pickle")
 MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}.pickle")
 
-RESOURCES_FULL = {
-    "da": {
-        "embeddings":
-            [RESOURCES_DIR+"/da/embeddings/danish_word_vectors_1300_cbow.bin",
-             RESOURCES_DIR+"/da/embeddings/da.bin"],
-        "lm":
-            RESOURCES_DIR+"/da/lm/danish_lm.bin",
-        "ubr":
-            RESOURCES_DIR+"/da/simplification/danish_dataset_ubr.txt",
-        "ranking_training_dataset":
-            RESOURCES_DIR+"/da/simplification/clean_danish_ls_dataset.txt",
-        "synonyms":
-            [RESOURCES_DIR + "/da/synonyms/da_synonyms_combined.csv"]}
-}
-
 RESOURCES = {
-    "da": {
-        "embeddings":
-            [RESOURCES_DIR+"/da/embeddings/danish_word_vectors_1300_cbow_"
-                           "filtered.bin",
-             RESOURCES_DIR + "/da/embeddings/da.bin"],
-        "lm":
-            RESOURCES_DIR + "/da/lm/danish_lm.bin",
-        "ubr":
-            RESOURCES_DIR + "/da/simplification/danish_dataset_ubr.txt",
-        "ranking_training_dataset":
-            RESOURCES_DIR + "/da/simplification/clean_danish_ls_dataset.txt",
-        "synonyms":
-            [RESOURCES_DIR + "/da/synonyms/da_synonyms_combined.csv"]}
+    "en": {
+        #"embeddings":
+        #    [RESOURCES_DIR + "/en/en_embedding.bin"],
+        #"lm":
+        #    RESOURCES_DIR + "/en/en_lm.bin",
+        #"ubr":
+        #    RESOURCES_DIR + "/en/en_ubr.txt",
+        #"ranking_training_dataset":
+        #    RESOURCES_DIR + "/en/en_ls.txt",
+        #"synonyms":
+        #    [RESOURCES_DIR + "/en/en_synonyms.csv"],
+        "mounica-lexicon":
+            RESOURCES_DIR + "/en/complexity_lexicon.tsv",
+        "ppdb-lexicon":
+            RESOURCES_DIR + "/en/simpleppdbpp_lexicon.txt",
+        "nrr": {
+            "train": RESOURCES_DIR + "/nrr/test_data_victor.txt",
+            "test": RESOURCES_DIR + "/nrr/train_data_victor.txt",
+            "lm": RESOURCES_DIR + "/nrr/subimdb_5_srilm_default.bin",
+            "lexicon": RESOURCES_DIR + "/nrr/lexicon.tsv",
+            "word2vec": RESOURCES_DIR + "/nrr/en_googlenews_embedding.bin",
+            "google": RESOURCES_DIR + "/nrr/semeval_train_test_google_freq.txt",
+            "wiki": RESOURCES_DIR + "/nrr/simpleppdb_human_wiki_ratio.txt",
+            "ppdb": RESOURCES_DIR + "/nrr/semeval_train_test_ppdb_scores.txt",
+            
+            #"model": MODELS_DIR + "/mounica/nrr_default.bin",
+        }
+    },
+        
 }

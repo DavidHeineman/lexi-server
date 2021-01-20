@@ -1,43 +1,21 @@
-# Backend for Lexi software
+# Lexi-English
 
-## Changelog
+Implements a backend for an English version of [Lexi](https://www.aclweb.org/anthology/C18-1021.pdf). Uses a different CWI and ranking model as described [in this paper](https://www.aclweb.org/anthology/D18-1410.pdf).
 
+## Data
 
-### Version 0.3.1
-+ restructured simplification pipeline: ranker and CWI use common scoring class
-+ single-word requests always pass through CWI
-+ featurizers still very POC, next step is to implement strong models
+Data is located in the `/res/en` folder. Modify `/lexi/config.py` to point the project to your data.
 
-### Version 0.3
-+ no more pickling!
-+ POS-based synonym selection
+## Setup
 
-### Version 0.2.5
-+ more general database error handling
+Install and setup Postgres database
 
-### Version 0.2.4
-+ bugfix in Database connection: rollback connection at error
+`pip install -r requirements.txt`
 
-### Version 0.2.3
-+ using synonym list for Danish
-+ return simplification objects with unique sessionIds
-+ accommodate for on-demand simplifications
+`python run_lexi_server.py -S`
 
-### Version 0.2.2
-+ simplify HTML only between given start and end character offset
+Install [Lexi Frontend](https://github.com/jbingel/lexi-frontend) and it will work in English.
 
-### Version 0.2.1
-+ blacklist words per user
+**Note:** If you're not running Lexi on `localhost`, use `lexi.cfg` to modify the server configuration.
 
-### Version 0.2.0
-+ massive restructuring of source
-+ marking if original word is displayed as first alternative
-
-### Version 0.1.2
-+ log frontend_version in database
-
-### Version 0.1.1
-+ small bugfix in database calls
-
-### Version 0.1
-+ initial tagged release
+## Differences between Lexi and Lexi-English

@@ -9,36 +9,35 @@ from logging.handlers import TimedRotatingFileHandler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sslify import SSLify
+from werkzeug.exceptions import HTTPException
 from lexi.server.util.database import DatabaseConnection, \
     DatabaseConnectionError
-from werkzeug.exceptions import HTTPException
-
-from lexi.config import LEXI_BASE, LOG_DIR, RANKER_PATH_TEMPLATE, \
-    CWI_PATH_TEMPLATE, MODELS_DIR, RESOURCES, SCORER_PATH_TEMPLATE,\
-    SCORER_MODEL_PATH_TEMPLATE
-from lexi.core.endpoints import update_ranker
-from lexi.core.simplification.lexical import LexicalSimplificationPipeline, \
-    LexiCWI, LexiRanker, LexiGenerator, LexiScorer
 from lexi.server.util import statuscodes
 from lexi.server.util.html import process_html
 from lexi.server.util.communication import make_response
 
-SCRIPTDIR = os.path.dirname(os.path.realpath(__file__))
+from lexi.config import LEXI_BASE, LOG_DIR, RANKER_PATH_TEMPLATE, \
+    CWI_PATH_TEMPLATE, MODELS_DIR, SCORER_PATH_TEMPLATE,\
+    SCORER_MODEL_PATH_TEMPLATE
+from lexi.core.endpoints import update_ranker
+
+from lexi.core.simplification.lexical_en import MounicaCWI, \
+    MounicaGenerator, MounicaRanker, MounicaSimplificationPipeline
 
 # ARG PARSING
-# description = "Run a Lexi server."
-# parser = argparse.ArgumentParser(description=description)
-# parser.add_argument('-S', '--disable-ssl',
-#                     action="store_true",
-#                     default=False,
-#                     help="Whether to disable SSL connection (e.g. "
-#                          "when developing on localhost).")
-# parser.add_argument('-l', '--log-level',
-#                     dest="log_level",
-#                     choices=('error', 'info', 'debug'),
-#                     default='info',
-#                     help='Logging verbosity level')
-# args = parser.parse_args()
+description = "Run a Lexi server w/ a modified English implementation."
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('-S', '--disable-ssl',
+                    action="store_true",
+                    default=False,
+                    help="Whether to disable SSL connection (e.g. "
+                         "when developing on localhost).")
+parser.add_argument('-l', '--log-level',
+                    dest="log_level",
+                    choices=('error', 'info', 'debug'),
+                    default='info',
+                    help='Logging verbosity level')
+args = parser.parse_args()
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 
@@ -46,7 +45,7 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 logger = logging.getLogger('lexi')
 log_level = logging.INFO
-# get logging level from CL argument, if set
+# Get logging level from CL argument, if set
 if hasattr(args, 'log_level'):
     arg2level = {'error': logging.ERROR,
                  'debug': logging.DEBUG,
@@ -57,24 +56,22 @@ fh = TimedRotatingFileHandler(LOG_DIR+'/lexi.log', when="midnight",
                               interval=1, encoding="UTF-8")
 fh.suffix = "%Y-%m-%d"
 fh.setLevel(log_level)
-# create console handler with a higher log level
+# Create console handler with a higher log level
 ch = logging.StreamHandler()
 ch.setLevel(log_level)
-# create formatter and add it to the handlers
+# Create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - '
                               '{%(filename)s:%(lineno)d} '
                               '%(levelname)s - %(message)s')
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
-# add the handlers to the logger
+# Add the handlers to the logger
 logger.addHandler(fh)
 logger.addHandler(ch)
-
 
 # CONFIGS
 cfg = ConfigParser()
 fs = cfg.read(LEXI_BASE+"/lexi.cfg")
-
 
 # DB CONNECTION
 db_params = {
@@ -106,7 +103,6 @@ while not db_connected:
         pw = getpass.getpass("Type database password: ")
         db_params["password"] = pw
 
-
 # FLASK SETUP
 app = Flask(__name__)
 cors = CORS(app)
@@ -119,32 +115,18 @@ else:
     logger.info("Not using SSL connection.")
 app.debug = False
 
-
 # LOADING DEFAULT MODEL
-simplification_pipeline = LexicalSimplificationPipeline("default")
-generator = LexiGenerator(synonyms_files=RESOURCES["da"]["synonyms"],
-                          embedding_files=RESOURCES["da"]["embeddings"])
-simplification_pipeline.setGenerator(generator)
-
-default_scorer = LexiScorer.staticload(SCORER_PATH_TEMPLATE.format("default"))
-logger.debug("SCORER PATH: {}".format(default_scorer.path))
-default_ranker = LexiRanker.staticload(RANKER_PATH_TEMPLATE.format("default"))
-default_ranker.set_scorer(default_scorer)
-default_cwi = LexiCWI.staticload(CWI_PATH_TEMPLATE.format("default"))
-default_cwi.set_scorer(default_scorer)
-
-personalized_rankers = {"default": default_ranker}
-personalized_cwi = {"default": default_cwi}
-personalized_scorers = {"default": default_scorer}
-
-logger.debug("Default ranker: {} ({})".format(default_ranker,
-                                              type(default_ranker)))
+simplification_pipeline = MounicaSimplificationPipeline("default")
+default_cwi = MounicaCWI()
+default_ranker = MounicaRanker()
+simplification_pipeline.setCwi(default_cwi)
+simplification_pipeline.setGenerator(MounicaGenerator())
+simplification_pipeline.setRanker(default_ranker)
 logger.info("Base simplifier loaded.")
 
 # BLACKLISTED WORDS, not to be simplified
 GENERIC_BLACKLIST = db_connection.get_blacklist(None)
 logger.debug("Generic blacklist: {}".format(GENERIC_BLACKLIST))
-
 
 @app.errorhandler(Exception)
 def handle_error(e):
@@ -176,13 +158,16 @@ def process():
     request_id = db_connection.insert_session(user_id, website_url,
                                               frontend_version=frontend_version,
                                               language=language)
-
-    cwi = None
+    
+    
     single_word_request = request.json.get("single_word_request", False)
-    if not single_word_request:
-        cwi = get_personalized_cwi(user_id)
-
-    ranker = get_personalized_ranker(user_id)
+    
+    # No personalization implemented here
+    # if not single_word_request:
+        # cwi = get_personalized_cwi(user_id)
+    # ranker = get_personalized_ranker(user_id)
+    cwi = default_cwi
+    ranker = default_ranker
 
     logger.info("Loaded CWI: "+str(cwi))
     logger.info("Loaded ranker: "+str(ranker))
@@ -190,6 +175,7 @@ def process():
     if not type(min_similarity) == float:
         raise ValueError("'min_similarity' must be a float. You "
                          "provided a {}".format(type(min_similarity)))
+
     html_out, simplifications = process_html(simplification_pipeline,
                                              request.json["html"],
                                              request.json.get("startOffset"),

@@ -7,3 +7,5 @@ trash/
 .idea
 lexi.cfg
 lexi/res/*
+.ipynb_checkpoints/
+res/
