@@ -14,4 +14,5 @@ class ComplexityLexicon(FeatureFunction):
         self.cwi_threshold = DEFAULT_THRESHOLD
 
     def process(self, word, sentence, startOffset, endOffset):
-        return float(self.lexicon.get_feature([sentence[startOffset:endOffset]])[0] / 6) > self.cwi_threshold
+        # return float(self.lexicon.get_feature([sentence[startOffset:endOffset]])[0] / 6) > self.cwi_threshold
+        return float(self.lexicon.get_feature([word])[0] / 6) > self.cwi_threshold

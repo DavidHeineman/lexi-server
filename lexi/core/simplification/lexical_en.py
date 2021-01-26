@@ -327,7 +327,6 @@ class LexiScorerNet(torch.nn.Module):
                     print("best params, loaded:")
                     print(list(self.parameters()))
                     return
-            print(loss)
             loss.backward()
             optimizer.step()
             # print(list(self.parameters()))
