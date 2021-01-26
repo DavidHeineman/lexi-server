@@ -22,7 +22,8 @@ from lexi.config import LEXI_BASE, LOG_DIR, RANKER_PATH_TEMPLATE, \
 from lexi.core.endpoints import update_ranker
 
 from lexi.core.simplification.lexical_en import MounicaCWI, \
-    MounicaGenerator, MounicaRanker, MounicaSimplificationPipeline
+    MounicaGenerator, MounicaRanker, MounicaSimplificationPipeline, \
+    MounicaScorer
 
 # ARG PARSING
 description = "Run a Lexi server w/ a modified English implementation."
@@ -115,13 +116,20 @@ else:
     logger.info("Not using SSL connection.")
 app.debug = False
 
-# LOADING DEFAULT MODEL
+# LOADING DEFAULT CWI
+default_scorer = MounicaScorer.staticload(SCORER_PATH_TEMPLATE.format("default"))
+logger.debug("SCORER PATH: {}".format(default_scorer.path))
+default_cwi = MounicaCWI.staticload(CWI_PATH_TEMPLATE.format("default"))
+default_cwi.set_scorer(default_scorer)
+personalized_cwi = {"default": default_cwi}
+personalized_scorers = {"default": default_scorer}
+
+# LOADING SIMPLIFICATION MODELS
 simplification_pipeline = MounicaSimplificationPipeline("default")
-default_cwi = MounicaCWI()
 default_ranker = MounicaRanker()
-simplification_pipeline.setCwi(default_cwi)
 simplification_pipeline.setGenerator(MounicaGenerator())
 simplification_pipeline.setRanker(default_ranker)
+simplification_pipeline.setCwi(default_cwi)
 logger.info("Base simplifier loaded.")
 
 # BLACKLISTED WORDS, not to be simplified
