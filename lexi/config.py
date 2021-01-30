@@ -21,8 +21,9 @@ LEXICAL_MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}-lexical.pickle")
 MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}.pickle")
 
 # Parameters for English Models
-DEFAULT_THRESHOLD = 0.52 # Default threshold for determining a word "complex" for new users
-NUM_REPLACEMENTS = 10   # Maximum number of candidate replacements generated
+DEFAULT_THRESHOLD = 0.52    # Default threshold for determining a word "complex" for new users
+NUM_REPLACEMENTS = 10       # Maximum number of candidate replacements generated
+NGRAM = 2                   # N-Gram number of google n-gram frequencies
 
 # See README.MD in project directory for links to download the data
 RESOURCES = {
@@ -37,7 +38,7 @@ RESOURCES = {
             "lm": RESOURCES_DIR + "/en/nrr/subimdb_5_srilm_default.bin",
             "lexicon": RESOURCES_DIR + "/en/complexity_lexicon.tsv",
             "word2vec": RESOURCES_DIR + "/en/nrr/en_googlenews_embedding.bin",
-            "google": RESOURCES_DIR + "/en/nrr/semeval_train_test_google_freq.txt",
+            "google": RESOURCES_DIR + "/en/nrr/google_freq_all.bin",
             "wiki": RESOURCES_DIR + "/en/nrr/simpleppdb_human_wiki_ratio.txt",
             "ppdb": RESOURCES_DIR + "/en/nrr/semeval_train_test_ppdb_scores.txt"
         },

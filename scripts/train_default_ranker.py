@@ -7,20 +7,19 @@ from lexi.core.en_nrr.metrics import evaluate_ranker
 from lexi.core.en_nrr.features.feature_extractor_sr import FeatureExtractorSR
 from lexi.config import RESOURCES, RANKER_DIR
 
-args = RESOURCES['en']['nrr']
-
 lr = 0.0005
 epochs = 100
 dropout = 0.2
 
 print("Loading resources")
-feat_extractor = FeatureExtractorSR(args)
+feat_extractor = FeatureExtractorSR(RESOURCES['en']['nrr'])
+print("Loaded google n-gram with %d words" % len(feat_extractor.google_frequency.google_frequencies))
 
 print("Extracting training data features")
-train_x, train_y = feat_extractor.get_features(args['train'], True)
+train_x, train_y = feat_extractor.get_features(RESOURCES['en']['nrr']['train'], True)
 
 print("Extracting test data features")
-test_x, test_y = feat_extractor.get_features(args['test'], False)
+test_x, test_y = feat_extractor.get_features(RESOURCES['en']['nrr']['test'], False)
 
 print("Training NRR model")
 nrr = NRR(train_x, train_y, dropout)
@@ -43,7 +42,7 @@ prediction_scores = [score[0] for score in nrr.predict(test_x).data.numpy()]
 
 count = -1
 pred_rankings = []
-for line in open(args['test'], encoding='utf-8'):
+for line in open(RESOURCES['en']['nrr']['test'], encoding='utf-8'):
     line = line.strip().split('\t')
     substitutes = [sub.strip().split(':')[1].strip() for sub in line[3:]]
     score_map = {}
@@ -60,7 +59,7 @@ for line in open(args['test'], encoding='utf-8'):
     pred_rankings.append(sorted(score_map.keys(), key=score_map.__getitem__))
 
 print("Evaluation")
-p_at_1, pearson = evaluate_ranker(args['test'], pred_rankings)
+p_at_1, pearson = evaluate_ranker(RESOURCES['en']['nrr']['test'], pred_rankings)
 print("Metrics (P@1, Pearson): %f %f" % (p_at_1*100, pearson))
 
 if not os.path.exists(RANKER_DIR):

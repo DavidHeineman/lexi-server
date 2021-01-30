@@ -52,7 +52,10 @@ class DatabaseConnection:
     def execute(self, query, log=True):
         try:
             if log:
-                logger.info("PSQL query: " + query)
+                if len(query) > 100:
+                    logger.info("PSQL query: " + query[:70] + "...")
+                else:
+                    logger.info("PSQL query: " + query)
             self.cursor.execute(query)
         except psycopg2.Error:
             self.pg_connection.rollback()

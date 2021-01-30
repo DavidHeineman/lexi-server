@@ -2,10 +2,12 @@ import re
 import torch
 import jsonpickle
 import logging
+import numpy as np
 from abc import ABCMeta, abstractmethod
 from nltk import WordNetLemmatizer
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import word_tokenize 
 from lexi.config import RESOURCES, MODELS_DIR, DEFAULT_THRESHOLD, \
     NUM_REPLACEMENTS, SCORER_PATH_TEMPLATE, SCORER_MODEL_PATH_TEMPLATE, \
     CWI_PATH_TEMPLATE
@@ -70,6 +72,11 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
         sent_offsets = list(util.span_tokenize_sents(text))
         logger.debug("Sentences: {}".format(sent_offsets))
         # word_offsets = util.span_tokenize_words(pure_text)
+
+        # substitution counter for debugging
+        count_sub = 0
+        count_nosub = 0
+
         for sb, se in sent_offsets:
             # ignore all sentences that end before the selection or start
             # after the selection
@@ -105,6 +112,16 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
                                  "for '{}'.".format(sent[wb:we]))
                     continue
                 logger.debug("Candidate replacements: {}.".format(candidates))
+
+                # STEP 3: SUBSTITUTION SELECTION
+                selected = self.selector.select(sent, wb, we, candidates)
+                if len(selected) == 0:
+                    logger.debug("No ngram representations found "
+                                 "for '{}' replacements.".format(sent[wb:we]))
+                    count_nosub += 1
+                else:
+                    candidates = selected
+                    count_sub += 1
                 
                 # STEP 4: RANKING
                 if ranker:
@@ -115,6 +132,8 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
                     ranking = candidates
                 offset2simplification[global_word_offset_start] = \
                     (sent[wb:we], ranking, sent, wb, we)             
+        # Debugging Substitution Selection
+        logger.info("Found n-gram representations for {} of {} substitutions | {}{}".format(count_sub, (count_sub + count_nosub), (count_sub / (count_sub + count_nosub)) * 100, "%"))
         return offset2simplification
 
 class MounicaPersonalizedPipelineStep(metaclass=ABCMeta):
@@ -149,7 +168,6 @@ class MounicaPersonalizedPipelineStep(metaclass=ABCMeta):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-
 
 class MounicaCWI(MounicaPersonalizedPipelineStep):
     def __init__(self, userId, scorer=None):
@@ -330,6 +348,63 @@ class LexiScorerNet(torch.nn.Module):
             loss.backward()
             optimizer.step()
             # print(list(self.parameters()))
+
+class MounicaSelector:
+    def __init__(self, ngram, google_freq_file=RESOURCES['en']['nrr']['google'], cutoff=0):
+        google_freq = {}
+        total = 0
+        nextone = 0
+        logger.debug("Loading google %d-gram frequencies..." % ngram)
+        for line in open(google_freq_file, encoding='utf-8'):
+            line_tokens = [t.strip() for t in line.strip().split('\t')]
+            try:
+                count = int(line_tokens[1])
+                if count > cutoff:
+                    google_freq[line_tokens[0]] = np.log10(count)
+                    total += 1
+                    nextone = 0
+            except IndexError:
+                logger.debug("Error: the following has no corresponding word: " + str(line_tokens))
+                pass
+            if (total % 1000 == 0 and nextone == 0):
+                nextone = 1
+                logger.debug("N-gram count: " + str(total))
+        logger.info("Total n-grams loaded: " + str(total))
+        self.ngram = ngram
+        self.google_freq = google_freq
+
+    def select(self, sent, so, eo, candidates):
+        cand = list(candidates)
+        scores = self.get_scores(sent, so, eo, cand)
+        out = []
+        for i in range(0, len(scores)):
+            if (scores[i] != 0):
+                out.append(cand[i])
+        return out
+
+    def get_scores(self, sent, so, eo, candidates):
+        t_b = word_tokenize(sent[:so])
+        t_a = word_tokenize(sent[eo:])
+        
+        if len(t_b) < self.ngram - 1:
+            t_b = ['<S>'] + t_b
+            
+        if len(t_a) < self.ngram - 1:
+            t_a = t_a + ['</S>']
+
+        scores = []
+        for word in candidates:
+            combos = t_b[-self.ngram + 1:] + [word] + t_a[:self.ngram - 1]
+            scores.append(0)
+            for j in range(0, len(combos) - self.ngram + 1):
+                phrase = ''
+                for word in combos[j:j + self.ngram]:
+                    phrase += word + ' '
+                phrase = phrase.lower()
+                if phrase[:-1] in self.google_freq:
+                    scores[-1] += self.google_freq[phrase[:-1]]
+        return scores
+    
 
 class MounicaGenerator:
     def __init__(self, ppdb_file=RESOURCES["en"]["ppdb-lexicon"], language="en"):
