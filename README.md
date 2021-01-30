@@ -35,7 +35,7 @@ Data is located in the `res/en` folder. Modify `lexi/config.py` to point the pro
 - [Initial Test Data]()
 - [Language Model (SubIMDB)]()
 - [Word2vec Word Embedding]()
-- [Google Frequencies]()
+- [Google Frequencies]() (Also used for selection)
 - [Wikipedia-SimplePPDB Word Ratio]()
 - [PPDB Scores]()
 

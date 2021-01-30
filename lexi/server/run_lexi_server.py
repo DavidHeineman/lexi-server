@@ -18,12 +18,12 @@ from lexi.server.util.communication import make_response
 
 from lexi.config import LEXI_BASE, LOG_DIR, RANKER_PATH_TEMPLATE, \
     CWI_PATH_TEMPLATE, MODELS_DIR, SCORER_PATH_TEMPLATE,\
-    SCORER_MODEL_PATH_TEMPLATE
+    SCORER_MODEL_PATH_TEMPLATE, NGRAM
 from lexi.core.endpoints import update_ranker
 
 from lexi.core.simplification.lexical_en import MounicaCWI, \
     MounicaGenerator, MounicaRanker, MounicaSimplificationPipeline, \
-    MounicaScorer
+    MounicaScorer, MounicaSelector
 
 # ARG PARSING
 description = "Run a Lexi server w/ a modified English implementation."
@@ -118,18 +118,19 @@ app.debug = False
 
 # LOADING DEFAULT CWI
 default_scorer = MounicaScorer.staticload(SCORER_PATH_TEMPLATE.format("default"))
-logger.debug("SCORER PATH: {}".format(default_scorer.path))
 default_cwi = MounicaCWI.staticload(CWI_PATH_TEMPLATE.format("default"))
 default_cwi.set_scorer(default_scorer)
+logger.debug("SCORER PATH: {}".format(default_scorer.path))
 personalized_cwi = {"default": default_cwi}
 personalized_scorers = {"default": default_scorer}
 
 # LOADING SIMPLIFICATION MODELS
 simplification_pipeline = MounicaSimplificationPipeline("default")
 default_ranker = MounicaRanker()
-simplification_pipeline.setGenerator(MounicaGenerator())
-simplification_pipeline.setRanker(default_ranker)
 simplification_pipeline.setCwi(default_cwi)
+simplification_pipeline.setGenerator(MounicaGenerator())
+simplification_pipeline.setSelector(MounicaSelector(NGRAM))
+simplification_pipeline.setRanker(default_ranker)
 logger.info("Base simplifier loaded.")
 
 # BLACKLISTED WORDS, not to be simplified
