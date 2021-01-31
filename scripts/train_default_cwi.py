@@ -6,14 +6,23 @@ from lexi.config import FEATURIZER_PATH_TEMPLATE, RESOURCES, FEATURIZERS_DIR, \
     CWI_DIR, SCORERS_DIR, DEFAULT_THRESHOLD, CWI_PATH_TEMPLATE
 from sklearn.naive_bayes import BernoulliNB
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_recall_curve
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import f1_score, accuracy_score, precision_recall_curve
+from sklearn.model_selection import train_test_split
 from scipy.stats.stats import spearmanr
 import sys
 import os
+import pickle
+
+# Ignore warnings about softmax (fix this)
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
+CWI_MODEL = 'mlp' # mlp or pytorch
 
 def main():
+    resources = RESOURCES['en']
+
     lf = LexicalFeaturizer()
     lf.add_feature_function(WordLength())
     lf.add_feature_function(SentenceLength())
@@ -21,15 +30,12 @@ def main():
     lf.add_feature_function(IsLower())
     lf.add_feature_function(IsNumerical())
     lf.add_feature_function(ComplexityLexicon())
-
+    
     items, y = [], []
-
     try:
         for line in open(RESOURCES['en']['cwi']['train'], encoding='utf-8'):
             line = line.strip().split("\t")
             if line:
-                # line[0] contains the sentence
-                # print(line[4] + "\t\t" + line[9] + "\t" + line[10])
                 s = line[1]           # Sentence
                 so = int(line[2])     # Start Offset
                 eo = int(line[3])     # End Offset
@@ -40,42 +46,60 @@ def main():
         pass
 
     x = lf.featurize(items, fit=True, scale_features=True)
-
-    if not os.path.exists(FEATURIZERS_DIR):
-        print('Saved featurizer to %s' % (FEATURIZERS_DIR+'/default.json'))
-        os.makedirs(FEATURIZERS_DIR)
-
-    lf.save(FEATURIZER_PATH_TEMPLATE.format("default"))
     y = np.array(y).reshape([-1, 1])
+    
+    # Comparison between custom torch model and sci-kit learn model
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    print("Training MLP Classifier w/ Train/Test split...")
+    mlp = MLPClassifier(max_iter=1000, warm_start=True, hidden_layer_sizes=[10])
+    mlp.fit(x_train, y_train.reshape(-1))
+    p = mlp.predict(x_test)
+    print("F1: %.4f | Accuracy: %.4f" % (f1_score(y_test, p), accuracy_score(y_test, p)))
 
-    ls = MounicaScorer("default", lf, [])
-    ls.train_model(x, y, epochs=1000, patience=10)
-    p = np.array(ls.predict(x))
+    print("Training custom pytorch w/ Train/Test split...")
+    ls = MounicaScorerOLD("default", lf, [])
+    ls.train_model(x_train, y_train, epochs=1000, patience=10)
+    p = np.array(ls.predict(x_test))
+    print("F1: %.4f | Accuracy: %.4f" % (f1_score(y_test, p), accuracy_score(y_test, p)))
+    
+    # We train the models again with all the data because we're not measuring their performance this time
+    if CWI_MODEL == 'mlp':
+        print("Training SK-Learn MLP Classifier...")
+        mlp = MLPClassifier(max_iter=1000, warm_start=True, hidden_layer_sizes=[10])
+        mlp.fit(x, y.reshape(-1))
+        p = mlp.predict(x)
+        print("Done!")
 
-    if not os.path.exists(SCORERS_DIR):
-        print('Saved model to %s' % (SCORERS_DIR+'/default.json'))
-        os.makedirs(SCORERS_DIR)
+        mlp_ls = MounicaScorer("default", lf, mlp)
+        mlp_ls.save()
+        print('Saved SK-Learn MLP scorer model to %s' % (SCORERS_DIR+'\default.json'))
+    elif CWI_MODEL == 'pytorch':
+        print("Training using custom pytorch model...")
+        ls = MounicaScorer("defaultOLD", lf, [])
+        ls.train_model(x, y, epochs=1000, patience=10)
+        p = np.array(ls.predict(x))
+        print("Done!")
+        
+        if not os.path.exists(SCORERS_DIR):
+            os.makedirs(SCORERS_DIR)
+        ls.save()
+        print('Saved scorer model to %s' % (SCORERS_DIR+'\default.json'))
 
-    ls.save()
+    # Save featurizer
+    if not os.path.exists(FEATURIZERS_DIR):
+        os.makedirs(FEATURIZERS_DIR)
+    lf.save(FEATURIZER_PATH_TEMPLATE.format("default"))
+    print('Saved featurizer to %s' % (FEATURIZERS_DIR+'\default.json'))
 
-    mlp = MLPRegressor(max_iter=1000, warm_start=True, hidden_layer_sizes=[10], verbose=False)
-    mlp.fit(x, y.reshape(-1))
-    p = mlp.predict(x)
-
-    language = 'en'
-    c = MounicaSimplificationPipeline(userId='default', language=language)
-    try:
-        resources = RESOURCES[language]
-    except KeyError:
-        print("Couldn't find resources for language {}".format(language))
-    c.setCwi(MounicaCWI("default"))
-    c.cwi.set_scorer(MounicaScorer.staticload(SCORER_PATH_TEMPLATE.format("default")))
-    c.cwi.set_cwi_threshold(DEFAULT_THRESHOLD)
+    # Configure and save CWI
+    cwi = MounicaCWI("default")
+    cwi.set_scorer(MounicaScorer.staticload(SCORER_PATH_TEMPLATE.format("default")))
+    cwi.set_cwi_threshold(DEFAULT_THRESHOLD)
 
     if not os.path.exists(CWI_DIR):
-        print('Saved model to %s' % (CWI_DIR+'/default.json'))
         os.makedirs(CWI_DIR)
-    c.cwi.save("default")
+    print('Saved CWI to %s' % (CWI_DIR+'\default.json'))
+    cwi.save("default")
 
 if __name__ == '__main__':
     main()

@@ -2,11 +2,9 @@ import re
 import torch
 import jsonpickle
 import logging
+import pickle
 import numpy as np
 from abc import ABCMeta, abstractmethod
-from nltk import WordNetLemmatizer
-from nltk.stem.lancaster import LancasterStemmer
-from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import word_tokenize 
 from lexi.config import RESOURCES, MODELS_DIR, DEFAULT_THRESHOLD, \
     NUM_REPLACEMENTS, SCORER_PATH_TEMPLATE, SCORER_MODEL_PATH_TEMPLATE, \
@@ -171,7 +169,7 @@ class MounicaPersonalizedPipelineStep(metaclass=ABCMeta):
 class MounicaCWI(MounicaPersonalizedPipelineStep):
     def __init__(self, userId, scorer=None):
         super().__init__(userId, scorer)
-        self.cwi_threshold = 0.67
+        self.cwi_threshold = DEFAULT_THRESHOLD
 
     def identify_targets(self, sent, token_offsets):
         return [(wb, we) for wb, we in token_offsets if
@@ -207,8 +205,74 @@ class MounicaCWI(MounicaPersonalizedPipelineStep):
             logger.warn("CWI file does not provide link to a scorer. Set "
                         "manually with ranker.set_scorer()!")
         return cwi
-        
+
 class MounicaScorer:
+    def __init__(self, userId, featurizer, model):
+        self.userId = userId
+        self.path = SCORER_PATH_TEMPLATE.format(userId)
+        self.featurizer = featurizer
+        self.model = model
+        # pickle.load(open(SCORER_PATH_TEMPLATE.format(self.userId), 'rb'))
+        self.model_path = SCORER_MODEL_PATH_TEMPLATE.format(self.userId)
+        self.cache = {}
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state['model'], state['cache']
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.cache = {}
+        self.model = self.build_model()
+
+    def get_path(self):
+        return SCORER_PATH_TEMPLATE.format(self.userId)
+
+    def set_userId(self, userId):
+        self.userId = userId
+        self.path = SCORER_PATH_TEMPLATE.format(userId)
+
+    def train_model(self, x, y, epochs=10, patience=5):
+        return
+
+    def update(self, data):
+        return
+
+    def build_model(self):
+        return
+
+    def score(self, sent, start_offset, end_offset):
+        cached = self.cache.get((sent, start_offset, end_offset))
+        if cached is not None:
+            return cached
+        item = (sent[start_offset:end_offset], sent, start_offset, end_offset)
+        x = self.featurizer.featurize([item])[0]
+        score = self.model.predict([x])[0]
+        self.cache[(sent, start_offset, end_offset)] = score
+        return score
+
+    def predict(self, x):
+        return [self.model.predict(x)]
+
+    def save(self):
+        # save state of this object, except model (excluded in __getstate__())
+        with open(self.get_path(), 'w') as f:
+            json = jsonpickle.encode(self)
+            f.write(json)
+        # save model
+        pickle.dump(self.model, open(self.model_path, 'wb'))
+
+    @staticmethod
+    def staticload(path):
+        with open(path) as jsonfile:
+            json = jsonfile.read()
+        scorer = jsonpickle.decode(json)
+        scorer.model = pickle.load(open(scorer.model_path, 'rb'))
+        scorer.cache = {}
+        return scorer
+
+class MounicaScorerOLD:
     def __init__(self, userId, featurizer, hidden_dims):
         self.userId = userId
         self.path = SCORER_PATH_TEMPLATE.format(userId)
@@ -300,6 +364,7 @@ class LexiScorerNet(torch.nn.Module):
             self.input = torch.nn.Linear(input_size, 1)
             self.out = lambda x: x
             self.hidden_layers = []
+        self.softmax = torch.nn.Softmax(dim=0)
         # self.apply(self.init_weights)
         # self.apply(torch.nn.init.xavier_normal_)
         # self.lossfunc = torch.nn.functional.binary_cross_entropy_with_logits
@@ -315,7 +380,8 @@ class LexiScorerNet(torch.nn.Module):
         h = torch.sigmoid(self.input(x))
         for layer in self.hidden_layers:
             h = torch.torch.nn.functional.relu(layer(h))
-        return torch.sigmoid(self.out(h))
+        laststep = torch.sigmoid(self.out(h))
+        return self.softmax(h)
 
     def fit(self, x, y, optimizer, epochs=100, patience=10):
         optimizer.zero_grad()
@@ -337,12 +403,12 @@ class LexiScorerNet(torch.nn.Module):
             else:
                 no_improvement_for += 1
                 if no_improvement_for == patience:
-                    print("BEST LOSS: {}".format(float(best_loss)))
-                    print("current params:")
-                    print(list(self.parameters()))
+                    # print("BEST LOSS: {}".format(float(best_loss)))
+                    # print("current params:")
+                    # print(list(self.parameters()))
                     self.load_state_dict(best_model)
-                    print("best params, loaded:")
-                    print(list(self.parameters()))
+                    # print("best params, loaded:")
+                    # print(list(self.parameters()))
                     return
             loss.backward()
             optimizer.step()

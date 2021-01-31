@@ -16,3 +16,6 @@ run_lexi_server.py
 complexity_test.ipynb
 train_default_cwi.py
 complexity_test.py
+*.pkl
+train_default_ranker.py
+.vscode/settings.json

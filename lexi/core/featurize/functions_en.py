@@ -1,5 +1,8 @@
-from abc import ABCMeta, abstractmethod
 import numpy as np
+from abc import ABCMeta, abstractmethod
+from nltk import WordNetLemmatizer
+from nltk.stem.lancaster import LancasterStemmer
+from nltk.stem.snowball import SnowballStemmer
 from lexi.core.featurize.functions import FeatureFunction
 from lexi.config import RESOURCES, DEFAULT_THRESHOLD
 
@@ -7,14 +10,13 @@ from lexi.config import RESOURCES, DEFAULT_THRESHOLD
   
 class ComplexityLexicon(FeatureFunction):
 
-    def __init__(self, name="word_length"):
+    def __init__(self, name="complexity_lexicon"):
         super().__init__(name)
         self.lexicon = WordComplexityLexicon(RESOURCES["en"]["mounica-lexicon"])
-        self.cwi_threshold = DEFAULT_THRESHOLD
 
     def process(self, word, sentence, startOffset, endOffset):
         # return float(self.lexicon.get_feature([sentence[startOffset:endOffset]])[0] / 6) > self.cwi_threshold
-        return float(self.lexicon.get_feature([word])[0] / 6) > self.cwi_threshold
+        return float(self.lexicon.get_feature([word])[0])
 
 class WordComplexityLexicon:
     def __init__(self, lexicon):

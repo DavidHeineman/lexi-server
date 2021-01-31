@@ -175,10 +175,6 @@ class DatabaseConnection:
                                      simplifications):
         if not simplifications:
             simplifications = {}
-        # if type(simplifications) == str:
-        #     simplfications = simplfications.replace(
-        #         "'", "''")
-        # aggregate by request ID
         request2simplifications = defaultdict(list)
         for target, target_simplfication in simplifications.items():
             request_id = target_simplfication['request_id']
@@ -196,8 +192,8 @@ class DatabaseConnection:
                     "simplifications = '{}', " \
                     "rating = {} " \
                     "WHERE request_id = {}; " \
-                .format(feedback_text, request_simplfications,
-                        rating, request_id)
+                .format(feedback_text, request_simplfications.replace(
+                    "'", "''"), rating, request_id)
             self.execute_and_commit(query)
 
 

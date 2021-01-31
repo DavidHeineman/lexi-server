@@ -121,8 +121,6 @@ default_scorer = MounicaScorer.staticload(SCORER_PATH_TEMPLATE.format("default")
 default_cwi = MounicaCWI.staticload(CWI_PATH_TEMPLATE.format("default"))
 default_cwi.set_scorer(default_scorer)
 logger.debug("SCORER PATH: {}".format(default_scorer.path))
-personalized_cwi = {"default": default_cwi}
-personalized_scorers = {"default": default_scorer}
 
 # LOADING SIMPLIFICATION MODELS
 simplification_pipeline = MounicaSimplificationPipeline("default")
@@ -132,6 +130,11 @@ simplification_pipeline.setGenerator(MounicaGenerator())
 simplification_pipeline.setSelector(MounicaSelector(NGRAM))
 simplification_pipeline.setRanker(default_ranker)
 logger.info("Base simplifier loaded.")
+
+# CREATING DICTS FOR PERSONALIZED MODELS
+personalized_rankers = {"default": default_ranker}
+personalized_cwi = {"default": default_cwi}
+personalized_scorers = {"default": default_scorer}
 
 # BLACKLISTED WORDS, not to be simplified
 GENERIC_BLACKLIST = db_connection.get_blacklist(None)
@@ -264,10 +267,9 @@ def get_feedback():
                 "Feedback text: {}".format(email, rating, website,
                                            feedback_text))
     logger.debug("Request: {}".format(request.json))
-    db_connection.update_session_with_feedback(rating, feedback_text,
-                                               simplifications)
+    db_connection.update_session_with_feedback(rating, feedback_text, simplifications)
     if simplifications:
-        logger.info(simplifications)
+        logger.info(str(simplifications)[:100] + "...") 
         # try:
         logger.debug("Getting ranker for user: {}".format(user_id))
         ranker = get_personalized_ranker(user_id)
@@ -330,7 +332,7 @@ def get_personalized_cwi(user_id):
         try:
             # retrieve model
             path = CWI_PATH_TEMPLATE.format(user_id)
-            cwi = LexiCWI.staticload(path)
+            cwi = MounicaCWI.staticload(path)
         except:
             logger.warning("Could not load personalized model. "
                            "Loading default cwi.")
@@ -353,12 +355,12 @@ def get_personalized_scorer(user_id):
         try:
             # retrieve model
             path = SCORER_PATH_TEMPLATE.format(user_id)
-            scorer = LexiScorer.staticload(path)
+            scorer = MounicaScorer.staticload(path)
         except:
             logger.warning("Could not load personalized model. "
                            "Loading default scorer.")
             path = SCORER_PATH_TEMPLATE.format("default")
-            scorer = LexiScorer.staticload(path)
+            scorer = MounicaScorer.staticload(path)
             scorer.set_userId(user_id)
             scorer.model_path = SCORER_MODEL_PATH_TEMPLATE.format(user_id)
         personalized_scorers[user_id] = scorer
