@@ -24,7 +24,7 @@ MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}.pickle")
 DEFAULT_THRESHOLD = 0.5     # Default threshold for determining a word "complex" for new users
 # Note: This won't be needed anymore because the new CWIs are classifiers
 NUM_REPLACEMENTS = 10       # Maximum number of candidate replacements generated
-NGRAM = 2                   # N-Gram number of google n-gram frequencies
+NGRAM = 3                   # N-Gram number of google n-gram frequencies
 
 # See README.MD in project directory for links to download the data
 RESOURCES = {

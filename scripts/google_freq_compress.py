@@ -2,11 +2,12 @@ import numpy as np
 
 # Loads a large n-gram file and saves all words with counts above CUTOFF
 large_file = 'res/en/nrr/google_freq_bigram_all.bin'
-CUTOFF = 100000
+CUTOFF = 10000
 
 total = 0
 nextone = 0
 orig = 0
+google_frequencies = {}
 for line in open(large_file, encoding='utf-8'):
     line_tokens = [t.strip() for t in line.strip().split('\t')]
     try:
@@ -20,7 +21,7 @@ for line in open(large_file, encoding='utf-8'):
     except IndexError:
         print("Error: the following has no corresponding word: " + str(line_tokens))
         pass
-    if (total % 100000 == 0 and nextone == 0):
+    if (total % 1000000 == 0 and nextone == 0):
         nextone = 1
         print("N-gram count: " + str(total))
 print('Total n-grams saved: %d of %d | %.5f%s' % (total, (total + orig), (total / orig) * 100, "%"))

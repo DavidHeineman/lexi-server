@@ -64,7 +64,7 @@ def main():
     
     # We train the models again with all the data because we're not measuring their performance this time
     if CWI_MODEL == 'mlp':
-        print("Training SK-Learn MLP Classifier...")
+        print("Training MLP Classifier to be used as the scorer...")
         mlp = MLPClassifier(max_iter=1000, warm_start=True, hidden_layer_sizes=[10])
         mlp.fit(x, y.reshape(-1))
         p = mlp.predict(x)
@@ -72,7 +72,7 @@ def main():
 
         mlp_ls = MounicaScorer("default", lf, mlp)
         mlp_ls.save()
-        print('Saved SK-Learn MLP scorer model to %s' % (SCORERS_DIR+'\default.json'))
+        print('Saved MLP scorer model to %s' % (SCORERS_DIR+'\default.json'))
     elif CWI_MODEL == 'pytorch':
         print("Training using custom pytorch model...")
         ls = MounicaScorer("defaultOLD", lf, [])
@@ -83,7 +83,7 @@ def main():
         if not os.path.exists(SCORERS_DIR):
             os.makedirs(SCORERS_DIR)
         ls.save()
-        print('Saved scorer model to %s' % (SCORERS_DIR+'\default.json'))
+        print('Saved pytorch scorer model to %s' % (SCORERS_DIR+'\default.json'))
 
     # Save featurizer
     if not os.path.exists(FEATURIZERS_DIR):

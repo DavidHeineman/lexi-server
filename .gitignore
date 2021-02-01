@@ -19,3 +19,4 @@ complexity_test.py
 *.pkl
 train_default_ranker.py
 .vscode/settings.json
+google_freq_compress.py

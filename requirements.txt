@@ -16,6 +16,7 @@ itsdangerous==1.1.0
 jsonpickle==1.5.0
 jmespath==0.9.4
 kenlm @ https://github.com/kpu/kenlm/archive/master.zip
+lemminflect==0.2.1
 mysql-connector-python==8.0.16
 nltk==3.4
 numpy==1.19.5

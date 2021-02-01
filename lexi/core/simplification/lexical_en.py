@@ -3,8 +3,11 @@ import torch
 import jsonpickle
 import logging
 import pickle
+import nltk
 import numpy as np
 from abc import ABCMeta, abstractmethod
+from lemminflect import getInflection
+from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize 
 from lexi.config import RESOURCES, MODELS_DIR, DEFAULT_THRESHOLD, \
     NUM_REPLACEMENTS, SCORER_PATH_TEMPLATE, SCORER_MODEL_PATH_TEMPLATE, \
@@ -73,6 +76,8 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
         # substitution counter for debugging
         count_sub = 0
         count_nosub = 0
+        targ_amount = 0
+        amount = []
 
         for sb, se in sent_offsets:
             # ignore all sentences that end before the selection or start
@@ -89,6 +94,8 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
                 if global_word_offset_start < startOffset or \
                         global_word_offset_end > endOffset:
                     continue
+
+                targ_amount += 1
 
                 # STEP 1: TARGET IDENTIFICATION
                 complex_word = True  # default case, e.g. for when no CWI module
@@ -119,6 +126,7 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
                 else:
                     candidates = selected
                     count_sub += 1
+                    amount.append(len(selected))
                 
                 # STEP 4: RANKING
                 if ranker:
@@ -130,7 +138,9 @@ class MounicaSimplificationPipeline(SimplificationPipeline):
                 offset2simplification[global_word_offset_start] = \
                     (sent[wb:we], ranking, sent, wb, we)             
         # Debugging Substitution Selection
+        logger.info("Identified {} of {} words as complex | {}{}".format((count_sub + count_nosub), targ_amount, ((count_sub + count_nosub) / targ_amount) * 100, "%"))
         logger.info("Found n-gram representations for {} of {} substitutions | {}{}".format(count_sub, (count_sub + count_nosub), (count_sub / (count_sub + count_nosub)) * 100, "%"))
+        logger.info("Average amount of n-gram representations identified: {} | {}{}".format(sum(amount) / len(amount), (sum(amount) / len(amount)) * 10, "%"))
         return offset2simplification
 
 class MounicaPersonalizedPipelineStep(metaclass=ABCMeta):
@@ -437,6 +447,8 @@ class MounicaSelector:
         logger.info("Total n-grams loaded: " + str(total))
         self.ngram = ngram
         self.google_freq = google_freq
+        self.ps = PorterStemmer()
+        self.lem = nltk.WordNetLemmatizer()
 
     def select(self, sent, so, eo, candidates):
         cand = list(candidates)
@@ -445,6 +457,10 @@ class MounicaSelector:
         for i in range(0, len(scores)):
             if (scores[i] != 0):
                 out.append(cand[i])
+
+        # This can filter out wrong tenses & duplicates before OR after ngram comparison
+        out = self.filter_out_tense(sent, so, eo, out)
+
         return out
 
     def get_scores(self, sent, so, eo, candidates):
@@ -470,6 +486,34 @@ class MounicaSelector:
                     scores[-1] += self.google_freq[phrase[:-1]]
         return scores
 
+    def filter_out_tense(self, sent, so, eo, candidates):
+        stems = []
+        out = []
+        word_tag = nltk.pos_tag([sent[so:eo]])[0][1]
+        stems.append(self.ps.stem(sent[so:eo]))
+        for word in candidates:
+            cand_stem = self.ps.stem(word)
+            if cand_stem not in stems:
+                stems.append(cand_stem)
+                try:
+                    out.append(getInflection(self.lem.lemmatize(word, pos=self.tag_for_lemmatizer(word)), tag=word_tag)[0])
+                except IndexError:
+                    # Lemminflect does not support all POS tags - lemminflect.readthedocs.io/en/latest/tags/
+                    out.append(word)
+                    logger.debug("ERROR: Lemminflect cannot convert {} with type {}, skipping".format(word, word_tag))
+        return out
+
+    def tag_for_lemmatizer(self, word):
+        tag = nltk.pos_tag([word])[0][1][:2]
+        if tag in ['VB']:
+            return 'v'
+        elif tag in ['JJ']:
+            return 'a'
+        elif tag in ['RB']:
+            return 'r'
+        else:
+            return 'n'
+        
 class MounicaGenerator:
     def __init__(self, ppdb_file=RESOURCES["en"]["ppdb-lexicon"], language="en"):
         self.language = language
