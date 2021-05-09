@@ -11,11 +11,14 @@ from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize 
 from lexi.config import RESOURCES, MODELS_DIR, DEFAULT_THRESHOLD, \
     NUM_REPLACEMENTS, SCORER_PATH_TEMPLATE, SCORER_MODEL_PATH_TEMPLATE, \
-    CWI_PATH_TEMPLATE
+    CWI_PATH_TEMPLATE, NRR_PATH_TEMPLATE, NRR_MODEL_PATH_TEMPLATE, \
+    RANKER_PATH_TEMPLATE
 from lexi.core.util import util
 from lexi.core.simplification import SimplificationPipeline
-from lexi.core.en_nrr.evaluator import SingleNRR
 logger = logging.getLogger('lexi')
+
+# For Ranker
+from lexi.core.en_nrr.nrr import NRR
 
 class MounicaSimplificationPipeline(SimplificationPipeline):
 
@@ -203,6 +206,7 @@ class MounicaCWI(MounicaPersonalizedPipelineStep):
         json = jsonpickle.encode(self)
         with open(CWI_PATH_TEMPLATE.format(userId), 'w') as jsonfile:
             jsonfile.write(json)
+        self.scorer.save()
 
     @staticmethod
     def staticload(path):
@@ -244,10 +248,17 @@ class MounicaScorer:
         self.path = SCORER_PATH_TEMPLATE.format(userId)
 
     def train_model(self, x, y, epochs=10, patience=5):
-        return
+        x_in = self.featurizer.featurize(x)
+        y_in = np.array(y).reshape([-1, 1])
+        logger.info("Fit new data to model: {}".format(str(x)[:300]))
+        self.model.partial_fit(x_in, y_in.reshape(-1))
 
     def update(self, data):
-        return
+        x, y = [], []
+        for (sent, so, eo), label in data:
+            x.append((sent[so:eo], sent, so, eo))
+            y.append(label)
+        self.train_model(x, y)
 
     def build_model(self):
         return
@@ -496,7 +507,11 @@ class MounicaSelector:
             if cand_stem not in stems:
                 stems.append(cand_stem)
                 try:
-                    out.append(getInflection(self.lem.lemmatize(word, pos=self.tag_for_lemmatizer(word)), tag=word_tag)[0])
+                    cand_tag = self.tag_for_lemmatizer(word)
+                    if cand_tag is None:
+                        out.append(getInflection(self.lem.lemmatize(word, pos=cand_tag), tag=word_tag)[0])
+                    else:
+                        out.append(word)
                 except IndexError:
                     # Lemminflect does not support all POS tags - lemminflect.readthedocs.io/en/latest/tags/
                     out.append(word)
@@ -534,14 +549,33 @@ class MounicaGenerator:
             
     def getSubstitutions(self, word):
         if word in self.corpus:
-            return set(self.corpus[word].keys())
+            return list(self.corpus[word].keys())
         else:
             return None
         
 class MounicaRanker:
-    def __init__(self, resources=RESOURCES):
-        self.nrr = SingleNRR(resources['en']['nrr'], MODELS_DIR+'/rankers/default.bin')
-        
+    def __init__(self, userId, nrr=None):
+        self.userId = userId
+        self.nrr = nrr
+        if self.nrr is not None:
+            self.nrr_path = nrr.path
+       
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state['nrr']
+        return state
+
+    def set_nrr(self, nrr):
+        self.nrr = nrr
+        self.nrr_path = nrr.get_path()
+
+    def set_userId(self, userId):
+        self.userId = userId
+
+    def update(self, data):
+        if self.nrr is not None:
+            self.nrr.update(data)
+    
     def rank(self, candidates, sentence=None, wb=0, we=0):
         try:
             output = self.nrr.evaluate(sentence, sentence[wb:we], candidates)
@@ -557,3 +591,99 @@ class MounicaRanker:
         except IndexError:
             output = candidates
         return output
+
+    def save(self, userId):
+        json = jsonpickle.encode(self)
+        with open(RANKER_PATH_TEMPLATE.format(userId), 'w') as jsonfile:
+            jsonfile.write(json)
+        self.nrr.save()
+
+    @staticmethod
+    def staticload(path, featurizer):
+        with open(path) as jsonfile:
+            json = jsonfile.read()
+        ranker = jsonpickle.decode(json)
+        if hasattr(ranker, "nrr_path") and ranker.nrr_path is not None:
+            ranker.set_nrr(MounicaNRR.staticload(ranker.nrr_path, featurizer))
+        else:
+            logger.warn("Ranker file does not provide link to a NRR. Set "
+                        "manually with ranker.set_nrr()!")
+        return ranker
+
+class MounicaNRR:
+    def __init__(self, userId, featurizer, dimensionality=600):
+        self.userId = userId
+        self.path = NRR_PATH_TEMPLATE.format(userId)
+        self.dimensionality = dimensionality
+        self.featurizer = featurizer
+        self.model_path = NRR_MODEL_PATH_TEMPLATE.format(userId)
+        self.model = self.build_model()
+        self.update_steps = 0
+        self.cache = {}
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state['model'], state['cache'], state['featurizer']
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.cache = {}
+        self.model = self.build_model()
+
+    def get_path(self):
+        return NRR_PATH_TEMPLATE.format(self.userId)
+
+    def set_userId(self, userId):
+        self.userId = userId
+        self.path = SCORER_PATH_TEMPLATE.format(userId)
+
+    def build_model(self):
+        return NRR(self.dimensionality) # self.featurizer.dimensions()
+
+    def update(self, data):
+        #for (sentence, start_offset, end_offset), label in data:
+        #    self.featurizer.get_features_single
+        #self.model.train(feedback_x, feedback_y, 100, 0.0005)
+        #self.update_steps += 1
+        return
+
+    def train_model(self, x, y, epochs, lr):
+        self.model.train(x, y, epochs, lr)
+        
+    def evaluate(self, sent, target, candidates):
+        # Extracts features from input
+        features = self.featurizer.get_features_single(sent, target, list(candidates))
+        # Uses trianed input NRR to predict scores
+        prediction_scores = [score[0] for score in self.model.predict(features).data.numpy()]
+        # Sorts output prediction scores
+        count = -1
+        substitutes = candidates
+        score_map = {}
+        for sub in substitutes:
+            score_map[sub] = 0.0
+        for s1 in substitutes:
+            for s2 in substitutes:
+                if s1 != s2:
+                    count += 1
+                    score = prediction_scores[count]
+                    score_map[s1] += score
+        return sorted(score_map.keys(), key=score_map.__getitem__)
+
+    def save(self):
+        # save state of this object, except model (excluded in __getstate__())
+        with open(self.get_path(), 'w') as f:
+            json = jsonpickle.encode(self)
+            f.write(json)
+        # save model
+        torch.save(self.model, self.model_path)
+
+    @staticmethod
+    def staticload(path, featurizer):
+        with open(path) as jsonfile:
+            json = jsonfile.read()
+        nrr = jsonpickle.decode(json)
+        nrr.cache = {}
+        nrr.model = nrr.build_model()
+        nrr.featurizer = featurizer
+        return nrr

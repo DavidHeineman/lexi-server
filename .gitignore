@@ -20,3 +20,16 @@ complexity_test.py
 train_default_ranker.py
 .vscode/settings.json
 google_freq_compress.py
+annotation/*
+pg_1_output.txt
+pg_6_output.txt
+demo-cwi-output/*
+~$chnical-paper.docx
+~WRL0003.tmp
+testpage.html
+testpage.json
+technical-paper/*
+data_CWI.json
+data_RANKER.json
+journal_article_paragraphs.txt
+scripts/test_brute_force_ngram_speed.py

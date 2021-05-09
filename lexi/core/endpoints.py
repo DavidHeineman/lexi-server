@@ -180,7 +180,7 @@ def process_html_lexical(pipeline, html, startOffset, endOffset, cwi, ranker,
     return html_out, simplifications
 
 
-def update_ranker(ranker, user_id, feedback, overall_rating=0):
+def update_cwi_and_ranker(cwi, ranker, user_id, feedback, overall_rating=0):
     """
     Collects feedback and updates ranker
     :param ranker: The personal ranker to update
@@ -190,13 +190,13 @@ def update_ranker(ranker, user_id, feedback, overall_rating=0):
     :return:
     """
     update_batch = []
-
+    
+    logger.debug("Updating CWI: {}".format(cwi))
     logger.debug("Updating ranker: {}".format(ranker))
-    logger.debug("Ranker has featurizer: {}".format(ranker.scorer.featurizer))
+    logger.debug("Ranker has featurizer: {}".format(ranker.nrr.featurizer))
 
     # iterate over feedback items (user choices for simplified words)
     for _, simplification in feedback.items():
-
         # catch some cases in which we don't want to do anything
         if simplification["bad_feedback"]:
             continue
@@ -236,7 +236,9 @@ def update_ranker(ranker, user_id, feedback, overall_rating=0):
                 int(w != simple_word)))  # label: 0 if w simple, 1 if difficult
 
     if update_batch:
+        cwi.update(update_batch)
         ranker.update(update_batch)
+        cwi.save(user_id)
         ranker.save(user_id)
     else:
         logger.info("Didn't get any useable feedback.")

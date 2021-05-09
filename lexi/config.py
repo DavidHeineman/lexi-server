@@ -7,6 +7,7 @@ MODELS_DIR = os.path.join(LEXI_BASE, "models")
 RANKER_DIR = os.path.join(MODELS_DIR, "rankers")
 CWI_DIR = os.path.join(MODELS_DIR, "cwi")
 SCORERS_DIR = os.path.join(MODELS_DIR, "scorers")
+NRR_DIR = os.path.join(MODELS_DIR, "nrr")
 FEATURIZERS_DIR = os.path.join(MODELS_DIR, "featurizers")
 RESOURCES_DIR = os.path.join(LEXI_BASE, "res")
 STANFORDNLP = os.path.join(RESOURCES_DIR, "stanfordnlp_resources")
@@ -15,6 +16,8 @@ RANKER_PATH_TEMPLATE = os.path.join(RANKER_DIR, "{}.json")
 CWI_PATH_TEMPLATE = os.path.join(CWI_DIR, "{}.json")
 SCORER_PATH_TEMPLATE = os.path.join(SCORERS_DIR, "{}.json")
 SCORER_MODEL_PATH_TEMPLATE = os.path.join(SCORERS_DIR, "{}.pt")
+NRR_PATH_TEMPLATE = os.path.join(NRR_DIR, "{}.json")
+NRR_MODEL_PATH_TEMPLATE = os.path.join(NRR_DIR, "{}.bin")
 FEATURIZER_PATH_TEMPLATE = os.path.join(FEATURIZERS_DIR, "{}.json")
 
 LEXICAL_MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}-lexical.pickle")
@@ -24,7 +27,7 @@ MODEL_PATH_TEMPLATE = os.path.join(MODELS_DIR, "{}.pickle")
 DEFAULT_THRESHOLD = 0.5     # Default threshold for determining a word "complex" for new users
 # Note: This won't be needed anymore because the new CWIs are classifiers
 NUM_REPLACEMENTS = 10       # Maximum number of candidate replacements generated
-NGRAM = 3                   # N-Gram number of google n-gram frequencies
+NGRAM = 2                   # N-Gram number of google n-gram frequencies
 
 # See README.MD in project directory for links to download the data
 RESOURCES = {

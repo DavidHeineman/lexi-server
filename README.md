@@ -39,6 +39,12 @@ Data is located in the `res/en` folder. Modify `lexi/config.py` to point the pro
 - [Wikipedia-SimplePPDB Word Ratio]()
 - [PPDB Scores]()
 
+## Scripts
+- `scripts/train_default_cwi.py` - Trains default CWI (see [Setup](## Setup))
+- `scripts/train_default_ranker.py` - Trains default ranker (see [Setup](## Setup))
+- `scripts/google_freq_compress.py` - Makes Google ngram files smaller by deleting the least frequent ngrams (this is to allow you to use the ngram models on a computer with little memory)
+- `scripts/cross_train_cwi_for_paper.py` - Get's a 10-fold average performance of the new Lexi model compared to the old Lexi model, as used in the paper
+
 ### Note: Differences between Lexi and Lexi-English
 - Lexi-English implements the same trainable CWI as Lexi, but uses a hard-coded lexical complexity lookup as a feature.
 - The substitution generator on Lexi got either thesaurus or the closest word2vec words, while Lexi-English generates candidates from SimplePPDB++. Candidates under a certian threshold for similarity are removed and are initally fed into the ranker by their complexity scores as determined by the dataset.

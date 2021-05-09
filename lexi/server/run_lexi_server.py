@@ -18,12 +18,18 @@ from lexi.server.util.communication import make_response
 
 from lexi.config import LEXI_BASE, LOG_DIR, RANKER_PATH_TEMPLATE, \
     CWI_PATH_TEMPLATE, MODELS_DIR, SCORER_PATH_TEMPLATE,\
-    SCORER_MODEL_PATH_TEMPLATE, NGRAM
-from lexi.core.endpoints import update_ranker
+    SCORER_MODEL_PATH_TEMPLATE, NGRAM, NRR_PATH_TEMPLATE, RESOURCES, \
+    NRR_MODEL_PATH_TEMPLATE
+from lexi.core.endpoints import update_cwi_and_ranker
 
 from lexi.core.simplification.lexical_en import MounicaCWI, \
     MounicaGenerator, MounicaRanker, MounicaSimplificationPipeline, \
-    MounicaScorer, MounicaSelector
+    MounicaScorer, MounicaSelector, MounicaNRR
+
+from lexi.core.en_nrr.features.feature_extractor_fast import FeatureExtractorFast
+
+# For timing logs
+from datetime import datetime
 
 # ARG PARSING
 description = "Run a Lexi server w/ a modified English implementation."
@@ -122,9 +128,14 @@ default_cwi = MounicaCWI.staticload(CWI_PATH_TEMPLATE.format("default"))
 default_cwi.set_scorer(default_scorer)
 logger.debug("SCORER PATH: {}".format(default_scorer.path))
 
+# LOADING DEFAULT RANKER
+nrr_featurizer = FeatureExtractorFast(RESOURCES['en']['nrr'])
+default_nrr = MounicaNRR.staticload(NRR_PATH_TEMPLATE.format('default'), nrr_featurizer)
+default_ranker = MounicaRanker.staticload(RANKER_PATH_TEMPLATE.format('default'), nrr_featurizer)
+logger.debug("NRR PATH: {}".format(default_ranker.nrr.model_path))
+
 # LOADING SIMPLIFICATION MODELS
 simplification_pipeline = MounicaSimplificationPipeline("default")
-default_ranker = MounicaRanker()
 simplification_pipeline.setCwi(default_cwi)
 simplification_pipeline.setGenerator(MounicaGenerator())
 simplification_pipeline.setSelector(MounicaSelector(NGRAM))
@@ -135,6 +146,7 @@ logger.info("Base simplifier loaded.")
 personalized_rankers = {"default": default_ranker}
 personalized_cwi = {"default": default_cwi}
 personalized_scorers = {"default": default_scorer}
+personalized_nrrs = {"default": default_nrr}
 
 # BLACKLISTED WORDS, not to be simplified
 GENERIC_BLACKLIST = db_connection.get_blacklist(None)
@@ -152,6 +164,9 @@ def handle_error(e):
 
 @app.route("/simplify", methods=["POST"])
 def process():
+    # For time logging
+    t0 = datetime.now()
+
     if not db_connection.test_connection():
         msg = "Could not connect to database."
         logger.error(msg)
@@ -174,12 +189,9 @@ def process():
     
     single_word_request = request.json.get("single_word_request", False)
     
-    # No personalization implemented here
-    # if not single_word_request:
-        # cwi = get_personalized_cwi(user_id)
-    # ranker = get_personalized_ranker(user_id)
-    cwi = default_cwi
-    ranker = default_ranker
+    if not single_word_request:
+        cwi = get_personalized_cwi(user_id)
+    ranker = get_personalized_ranker(user_id, nrr_featurizer)
 
     logger.info("Loaded CWI: "+str(cwi))
     logger.info("Loaded ranker: "+str(ranker))
@@ -198,6 +210,8 @@ def process():
                                              blacklist=GENERIC_BLACKLIST)
     db_connection.update_session_with_simplifications(request_id,
                                                       simplifications)
+    # Logged time for processing
+    logger.info('Processing time: {}'.format(datetime.now() - t0))
     return make_response(statuscodes.OK,
                          "Simplification successful",
                          html=html_out,
@@ -271,10 +285,12 @@ def get_feedback():
     if simplifications:
         logger.info(str(simplifications)[:100] + "...") 
         # try:
-        logger.debug("Getting ranker for user: {}".format(user_id))
-        ranker = get_personalized_ranker(user_id)
+        logger.debug("Getting cwi & ranker for user: {}".format(user_id))
+        cwi = get_personalized_cwi(user_id)
+        ranker = get_personalized_ranker(user_id, nrr_featurizer)
+        logger.debug("CWI: {}".format(cwi))
         logger.debug("Ranker: {}".format(ranker))
-        update_ranker(ranker, user_id, simplifications, rating)
+        update_cwi_and_ranker(cwi, ranker, user_id, simplifications, rating)
         return make_response(statuscodes.OK, "Feedback successful")
     else:
         msg = "Did not receive any simplifications"
@@ -303,7 +319,7 @@ def versioncheck():
                          download_url=download_url)
 
 
-def get_personalized_ranker(user_id):
+def get_personalized_ranker(user_id, featurizer):
     if user_id in personalized_rankers:
         logger.info("Using personalized ranker, still in memory.")
         ranker = personalized_rankers[user_id]
@@ -312,11 +328,11 @@ def get_personalized_ranker(user_id):
         try:
             # retrieve model
             path = RANKER_PATH_TEMPLATE.format(user_id)
-            ranker = LexiRanker.staticload(path)
+            ranker = MounicaRanker.staticload(path, featurizer)
         except:
             ranker = copy.copy(personalized_rankers["default"])
             ranker.set_userId(user_id)
-        ranker.set_scorer(get_personalized_scorer(user_id))
+        ranker.set_nrr(get_personalized_nrr(user_id, nrr_featurizer))
         personalized_rankers[user_id] = ranker
     logger.info("Rankers in memory for users: {} (total number of {}).".format(
         list(personalized_rankers.keys()), len(personalized_rankers)))
@@ -365,6 +381,28 @@ def get_personalized_scorer(user_id):
             scorer.model_path = SCORER_MODEL_PATH_TEMPLATE.format(user_id)
         personalized_scorers[user_id] = scorer
     return scorer
+
+def get_personalized_nrr(user_id, featurizer):
+    logger.debug("Getting personalized NRR for user {}. In memory? {}".format(user_id, user_id in personalized_nrrs))
+    if user_id in personalized_nrrs:
+        logger.info("Using personalized NRR, still in memory.")
+        nrr = personalized_nrrs[user_id]
+        logger.debug("Scorer Featurizer: {}".format(hasattr(nrr, "featurizer")))
+    else:
+        logger.info("Gotta load NRR or use default...")
+        try:
+            # retrieve model
+            path = NRR_PATH_TEMPLATE.format(user_id)
+            nrr = MounicaNRR.staticload(path, featurizer)
+        except:
+            logger.warning("Could not load personalized model. "
+                           "Loading default nrr.")
+            path = NRR_PATH_TEMPLATE.format("default")
+            nrr = MounicaNRR.staticload(path, featurizer)
+            nrr.set_userId(user_id)
+            nrr.model_path = NRR_MODEL_PATH_TEMPLATE.format(user_id)
+        personalized_nrrs[user_id] = nrr
+    return nrr
 
 
 if __name__ == "__main__":

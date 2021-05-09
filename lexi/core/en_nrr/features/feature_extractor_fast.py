@@ -12,7 +12,7 @@ from lexi.core.en_nrr.features.syllable_counter import SyllableCounter
 from lexi.core.en_nrr.features.ngram_probabilities import NgramProbability
 
 
-class FeatureExtractorSR:
+class FeatureExtractorFast:
 
     def __init__(self, resources):
         self.syllable_counter = SyllableCounter()
@@ -43,10 +43,11 @@ class FeatureExtractorSR:
                     pairwise_features = self._get_pairwise_features(fv1, fv2, candidates[i], candidates[j])
                     all_features.append(pairwise_features)
 
+        # This should be False since we're not training, but it gives errors otherwise...
         return self._transform_features(all_features, True)
 
     def dimensions(self):
-        return 600
+        return 49
         # return len(self._get_instance_features(['a'], 'a b', 'a')['a'])
 
     def get_features(self, corpus_path, train_flag):
@@ -94,17 +95,18 @@ class FeatureExtractorSR:
         features.extend([f1 - f2 for f1, f2 in zip(v1, v2)])
 
         words1, words2 = self._tokenize(phrase1), self._tokenize(phrase2)
-        p1 = self.word2vec.get_word2vec_vector(words1)
-        p2 = self.word2vec.get_word2vec_vector(words2)
-        features.append(self.word2vec.get_cosine(p1, p2))
+        # p1 = self.word2vec.get_word2vec_vector(words1)
+        # p2 = self.word2vec.get_word2vec_vector(words2)
+        # features.append(self.word2vec.get_cosine(p1, p2))
         features.append(self.ppdb_score.get_feature(phrase1, phrase2))
         return features
 
     def _transform_features(self, features, train_flag):
         features = np.array(features)
-        if train_flag:
-            self.binner.fit(features, len(features[0]))
-        return self.binner.transform(features, len(features[0]))
+        # if train_flag:
+        #     self.binner.fit(features, len(features[0]))
+        # return self.binner.transform(features, len(features[0]))
+        return features
 
     def _get_num_syllables(self, words):
         return sum([self.syllable_counter.get_feature(word) for word in words])
