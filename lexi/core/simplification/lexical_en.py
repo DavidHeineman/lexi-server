@@ -15,6 +15,7 @@ from lexi.config import RESOURCES, MODELS_DIR, DEFAULT_THRESHOLD, \
     RANKER_PATH_TEMPLATE
 from lexi.core.util import util
 from lexi.core.simplification import SimplificationPipeline
+from nltk.tokenize import TreebankWordTokenizer as twt
 logger = logging.getLogger('lexi')
 
 # For Ranker
@@ -687,3 +688,183 @@ class MounicaNRR:
         nrr.model = nrr.build_model()
         nrr.featurizer = featurizer
         return nrr
+
+#### NEW PHRASAL MODELS FOR DATA COLLECTION - SHOULD EVENTUALLY BE USED IN MODEL
+class MounicaGeneratorPhrasal:
+    def __init__(self, ppdb_file=RESOURCES["en"]["ppdb-lexicon"], ppdb_phrasal_file=RESOURCES["en"]["ppdb-lexicon-phrasal"], language="en"):
+        self.language = language
+        self.corpusSingle = {}
+        self.corpusPhrasal = {}
+        self.tokenizer = twt()
+
+        # Open corpus for singular words
+        for line in open(ppdb_file, encoding='utf-8'):
+            tokens = [t.strip() for t in line.strip().split('\t')]
+            if float(tokens[2]) > 0:
+                if tokens[0] not in self.corpusSingle:
+                    replacements = {}
+                else:
+                    replacements = self.corpusSingle[tokens[0]]
+                if tokens[0] not in self.corpusSingle or len(self.corpusSingle[tokens[0]]) < NUM_REPLACEMENTS:
+                    replacements[tokens[1]] = float(tokens[2])
+                    self.corpusSingle[tokens[0]] = replacements
+        for key in self.corpusSingle.keys():
+            self.corpusSingle[key] = dict(sorted(self.corpusSingle[key].items(), key=lambda item: item[1], reverse=True))
+
+        # Open corpus for phrases
+        for line in open(ppdb_phrasal_file, encoding='utf-8'):
+            tokens = [t.strip() for t in line.strip().split('\t')]
+            if float(tokens[2]) > 0:
+                if tokens[0] not in self.corpusPhrasal:
+                    replacements = {}
+                else:
+                    replacements = self.corpusPhrasal[tokens[0]]
+                if tokens[0] not in self.corpusPhrasal or len(self.corpusPhrasal[tokens[0]]) < NUM_REPLACEMENTS:
+                    replacements[tokens[1]] = float(tokens[2])
+                    self.corpusPhrasal[tokens[0]] = replacements
+        for key in self.corpusPhrasal.keys():
+            self.corpusPhrasal[key] = dict(sorted(self.corpusPhrasal[key].items(), key=lambda item: item[1], reverse=True))
+
+    def factorizePhrase(self, sent, so, eo):
+        t_b = list((sent[wb:we], wb, we) for (wb, we) in list(self.tokenizer.span_tokenize(sent[:so])))
+        t_a = list((sent[wb:we], wb, we) for (wb, we) in list((wb+eo, we+eo) for (wb, we) in self.tokenizer.span_tokenize(sent[eo:])))
+        t_b = [('<S>', 0, 0)] + t_b
+        t_a = t_a + [('</S>', len(sent)- 1, len(sent) - 1)]
+
+        ngrams = []
+        for i in range(0,8):
+            for j in range(0,8):
+                out = sent[so:eo]
+                rb = so
+                re = eo
+                if (i != 0):
+                    for word in t_b[::-1][:i]:
+                        out = word[0] + " " + out
+                        rb = word[1]
+                if (j != 0):
+                    for word in t_a[:j]:
+                        out = out + " " + word[0]
+                        re = word[2]
+                if (len(word_tokenize(out)) < 8 and out not in ngrams):
+                    ngrams.append((out, rb, re))
+        return ngrams
+
+    def getSubstitutions(self, sent, wb, we):
+        output = list()
+        if sent[wb:we].lower() in self.corpusSingle:
+            for word in list(self.corpusSingle[sent[wb:we].lower()].keys()):
+                output.append((wb, we, word, self.corpusSingle[sent[wb:we].lower()][word]))
+        
+        ngrams = self.factorizePhrase(sent, wb, we)
+        for phrase, rb, re in ngrams:
+            if phrase.lower() in self.corpusPhrasal:
+                for genPhrase in list(self.corpusPhrasal[phrase.lower()].keys()):
+                    output.append((rb, re, genPhrase, self.corpusPhrasal[phrase.lower()][genPhrase]))
+        
+        output.sort(key = lambda x: x[3], reverse=True)
+        output = [(a,b,c) for (a,b,c,d) in output][:10]
+
+        if len(output) == 0:
+            return None
+        return output
+
+class MounicaSelectorPhrasal:
+    def __init__(self, ngram, google_freq_file=RESOURCES['en']['nrr']['google'], cutoff=0):
+        self.hi = 1
+    
+    def select(self, sent, so, eo, candidates):
+        return candidates[:10]
+
+class MounicaSelectorPhrasalTEMP:
+    def __init__(self, ngram, google_freq_file=RESOURCES['en']['nrr']['google'], cutoff=0):
+        google_freq = {}
+        total = 0
+        nextone = 0
+        logger.debug("Loading google %d-gram frequencies..." % ngram)
+        for line in open(google_freq_file, encoding='utf-8'):
+            line_tokens = [t.strip() for t in line.strip().split('\t')]
+            try:
+                count = int(line_tokens[1])
+                if count > cutoff:
+                    google_freq[line_tokens[0]] = np.log10(count)
+                    total += 1
+                    nextone = 0
+            except IndexError:
+                logger.debug("Error: the following has no corresponding word: " + str(line_tokens))
+                pass
+            if (total % 1000 == 0 and nextone == 0):
+                nextone = 1
+                logger.debug("N-gram count: " + str(total))
+        logger.info("Total n-grams loaded: " + str(total))
+        self.ngram = ngram
+        self.google_freq = google_freq
+        self.ps = PorterStemmer()
+        self.lem = nltk.WordNetLemmatizer()
+
+    def select(self, sent, so, eo, candidates):
+        cand = list(candidates)
+        scores = self.get_scores(sent, so, eo, cand)
+        out = []
+        for i in range(0, len(scores)):
+            if (scores[i] != 0):
+                out.append(cand[i])
+
+        # This can filter out wrong tenses & duplicates before OR after ngram comparison
+        out = self.filter_out_tense(sent, so, eo, out)
+
+        return out
+
+    def get_scores(self, sent, so, eo, candidates):
+        t_b = word_tokenize(sent[:so])
+        t_a = word_tokenize(sent[eo:])
+        
+        if len(t_b) < self.ngram - 1:
+            t_b = ['<S>'] + t_b
+            
+        if len(t_a) < self.ngram - 1:
+            t_a = t_a + ['</S>']
+
+        scores = []
+        for word in candidates:
+            combos = t_b[-self.ngram + 1:] + [word] + t_a[:self.ngram - 1]
+            scores.append(0)
+            for j in range(0, len(combos) - self.ngram + 1):
+                phrase = ''
+                for word in combos[j:j + self.ngram]:
+                    phrase += word + ' '
+                phrase = phrase.lower()
+                if phrase[:-1] in self.google_freq:
+                    scores[-1] += self.google_freq[phrase[:-1]]
+        return scores
+
+    def filter_out_tense(self, sent, so, eo, candidates):
+        stems = []
+        out = []
+        word_tag = nltk.pos_tag([sent[so:eo]])[0][1]
+        stems.append(self.ps.stem(sent[so:eo]))
+        for word in candidates:
+            cand_stem = self.ps.stem(word)
+            if cand_stem not in stems:
+                stems.append(cand_stem)
+                try:
+                    cand_tag = self.tag_for_lemmatizer(word)
+                    if cand_tag is None:
+                        out.append(getInflection(self.lem.lemmatize(word, pos=cand_tag), tag=word_tag)[0])
+                    else:
+                        out.append(word)
+                except IndexError:
+                    # Lemminflect does not support all POS tags - lemminflect.readthedocs.io/en/latest/tags/
+                    out.append(word)
+                    logger.debug("ERROR: Lemminflect cannot convert {} with type {}, skipping".format(word, word_tag))
+        return out
+
+    def tag_for_lemmatizer(self, word):
+        tag = nltk.pos_tag([word])[0][1][:2]
+        if tag in ['VB']:
+            return 'v'
+        elif tag in ['JJ']:
+            return 'a'
+        elif tag in ['RB']:
+            return 'r'
+        else:
+            return 'n'

@@ -36,6 +36,8 @@ RESOURCES = {
             RESOURCES_DIR + "/en/complexity_lexicon.tsv",
         "ppdb-lexicon":
             RESOURCES_DIR + "/en/simpleppdbpp_lexicon.txt",
+        "ppdb-lexicon-phrasal": 
+            RESOURCES_DIR + "/en/simpleppdbpp-phrasal.txt",
         "nrr": {
             "train": RESOURCES_DIR + "/en/nrr/test_data_victor.txt",
             "test": RESOURCES_DIR + "/en/nrr/train_data_victor.txt",

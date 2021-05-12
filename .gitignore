@@ -33,3 +33,5 @@ data_CWI.json
 data_RANKER.json
 journal_article_paragraphs.txt
 scripts/test_brute_force_ngram_speed.py
+ranker-reordering.ipynb
+runtime.ipynb
